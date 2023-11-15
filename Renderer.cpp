@@ -1,56 +1,41 @@
 #include <iostream>
 #include <SFML/Window.hpp>
 #include <GL/glew.h>
+#include <fstream>
+#include <sstream>
 
 #include "Mesh.h"
 #include "Shader.h"
 #include "Camera.h"
+#include "Object.h"
+#include "Model.h"
+#include "Input.h"
 
 const float SPEED = 6.0f;
 const float SENSITIVITY = 5.0f;
 
+std::string readTextFile(const std::string &fileName);
 int main()
 {
     sf::Window window(sf::VideoMode(800, 800), "OpenGL hello world");
-
-    // raw GLSL vertex and fragment shaders.
-    const char *vertexShaderCode = "#version 330 core\n"
-                                   "layout (location = 0) in vec3 pos;\n"
-                                   "uniform mat4 projection;\n"
-                                   "uniform mat4 view;\n"
-                                   "void main() { gl_Position = projection*view*vec4(pos, 1.0);}\n";
-
-    const char *fragmentShaderCode = "#version 330 core\n"
-                                     "out vec4 FragColor;\n"
-                                     "uniform vec3 color;\n"
-                                     "void main() { FragColor = vec4(color, 1.0); }\n";
-
     // initialize GLEW
     if (glewInit() != GLEW_OK)
     {
         std::cerr << "Failed to initialize glew\n";
         return -1;
     }
-    Shader shader(vertexShaderCode, fragmentShaderCode);
-    // creating mesh
-    Mesh mesh({
-                  glm::vec3(0.8f, 0.8f, 0.0f),
-                  glm::vec3(0.8f, -0.8f, 0.0f),
-                  glm::vec3(-0.8f, -0.8f, 0.0f),
-                  glm::vec3(-0.8f, 0.8f, 0.0f),
-              },
-              {0, 1, 3, 1, 2, 3});
+    Shader shader(readTextFile("vertex.glsl"), readTextFile("fragment.glsl"));
+
+    // you should be loading your models through a file by replacing YOUR_SCENE with the fbx file.
+    Model model("YOUR_SCENE.fbx");
 
     Camera camera(glm::vec3(0.0f, 0.0f, 2.0f));
-
-    uint32_t vao{}, vbo{}, ebo{};
-    // gluint expects an unsigned int. for some reason uint32_t works, size_t doesnt.
-
+    Input input(SENSITIVITY, SPEED);
+    Object object(&model);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     bool isFirstMouse = true;
     sf::Vector2i lastMousePosition{};
-
     sf::Clock clock{};
     while (window.isOpen())
     {
@@ -73,60 +58,36 @@ int main()
 
         // before rendering
         camera.updateDirectionVectors();
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-        {
-            camera.setPosition(camera.getPosition() + (camera.getForward() * SPEED * deltaTime));
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-        {
-            camera.setPosition(camera.getPosition() - (camera.getRight() * SPEED * deltaTime));
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-        {
-            camera.setPosition(camera.getPosition() - (camera.getForward() * SPEED * deltaTime));
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-        {
-            camera.setPosition(camera.getPosition() + (camera.getRight() * SPEED * deltaTime));
-        }
-
+        input.handleKeyboard(camera, deltaTime);
+        input.handleMouse(camera, window, deltaTime, isFirstMouse, lastMousePosition);
 
         // isFirstMouse gymnastics basically ensure that you can hold down mouse right and drag around to look
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
-        {
-            if (isFirstMouse)
-            {
-                lastMousePosition = sf::Mouse::getPosition(window);
-                isFirstMouse = false;
-                window.setMouseCursorVisible(false);
-            }
-            else
-            {
-                 sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                 int xOffset = mousePos.x - lastMousePosition.x;
-                 int yOffset = lastMousePosition.y - mousePos.y;
-                 sf::Mouse::setPosition(lastMousePosition, window);
-
-                 camera.setYaw(camera.getYaw() + xOffset*SENSITIVITY*deltaTime);
-                 camera.setPitch(camera.getPitch() + yOffset*SENSITIVITY*deltaTime);
-            }
-        }
-        else
-        {
-            isFirstMouse = true;
-            window.setMouseCursorVisible(true);
-        }
 
         glClear(GL_COLOR_BUFFER_BIT);
 
         // rendering portion
         shader.use();
-        shader.setValue("projection", camera.getProjectionMatrix(window.getSize().x, window.getSize().y));
+        shader.setValue("projection", camera.getProjectionMatrix((float)window.getSize().x, (float)window.getSize().y));
         shader.setValue("view", camera.getViewMatrix());
         shader.setValue("color", glm::vec3(1.0f, 0.5f, 0.5f));
-        mesh.draw();
+        object.draw(shader, glm::vec3(1.0f, 1.0f, 0.5f));
         window.display();
     }
     return 0;
+}
+
+std::string readTextFile(const std::string &fileName)
+{
+    std::ifstream file(fileName);
+    if (!file.is_open())
+    {
+        std::cout << "Failed to read file properly";
+        return "";
+    }
+
+    std::stringstream ss{};
+    ss << file.rdbuf();
+    file.close();
+
+    return ss.str();
 }
