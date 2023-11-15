@@ -11,6 +11,9 @@
 #include "Model.h"
 #include "Input.h"
 
+
+//Put your model file here
+const std::string modelFile = "YOUR_NAME.fbx";
 const float SPEED = 6.0f;
 const float SENSITIVITY = 5.0f;
 
@@ -26,8 +29,8 @@ int main()
     }
     Shader shader(readTextFile("vertex.glsl"), readTextFile("fragment.glsl"));
 
-    // you should be loading your models through a file by replacing YOUR_SCENE with the fbx file.
-    Model model("YOUR_SCENE.fbx");
+    // you should be loading your models through a file by replacing YOUR_SCENE on line 16 with the fbx file.
+    Model model(modelFile);
 
     Camera camera(glm::vec3(0.0f, 0.0f, 2.0f));
     Input input(SENSITIVITY, SPEED);
